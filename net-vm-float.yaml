@@ -1,0 +1,79 @@
+heat_template_version: 2015-04-30
+
+description: >
+  HOT template to create a VirtualNetwork:
+
+parameters:
+  network_name:
+    type: string
+    description: name for the VirtualNetwork
+  network_ipam_refs:
+    type: string
+    description: network_ipam_refs for the VirtualNetwork
+  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix:
+    type: string
+    description: ip_prefix for the VirtualNetwork
+  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix_len:
+    type: number
+    description: ip_prefix_len for the VirtualNetwork
+  project:
+    type: string
+    description: project for the VirtualNetwork
+  image:
+    type: string
+    label: Image name or ID
+    description: Image to be used for compute instance
+    default: trusty-iperf3-jumbo
+  flavor:
+    type: string
+    label: Flavor
+    description: Type of instance (flavor) to be used
+    default: m1.small
+  key:
+    type: string
+    label: Key name
+    description: Name of key-pair to be used for compute instance
+    default: my-key
+
+resources:
+  template_VirtualNetwork:
+    type: OS::Contrail::VirtualNetwork
+    properties:
+      name: { get_param: network_name }
+      network_ipam_refs: { get_param: network_ipam_refs }
+      network_ipam_refs_data:
+        {
+          network_ipam_refs_data_ipam_subnets:
+            [{
+              network_ipam_refs_data_ipam_subnets_subnet:
+                {
+                  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix: { get_param: network_ipam_refs_data_ipam_subnets_subnet_ip_prefix },
+                  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix_len: { get_param: network_ipam_refs_data_ipam_subnets_subnet_ip_prefix_len },
+                },
+            }],
+        }
+      project: { get_param: project }
+  my_instance:
+    type: OS::Nova::Server
+    properties:
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key_name: { get_param: key }
+      availability_zone: nova
+      networks:
+        - network: { get_resource: template_VirtualNetwork }
+  MyFloatingIP: 
+    type: OS::Nova::FloatingIP
+    properties: 
+      pool: public
+
+  MyFloatingIPAssociation:
+    type: OS::Nova::FloatingIPAssociation
+    properties:
+      server_id: { get_resource: my_instance}
+      floating_ip: { get_resource: MyFloatingIP}
+
+outputs:
+  public_ip: 
+    description: Floating IP address of the VM
+    value: {get_attr: [MyFloatingIP, ip]}
